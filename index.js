@@ -24,26 +24,110 @@ function isOfficialDomain(url) {
     ".io",
   ];
   const unwantedDomains = [
-    "toplist",
-    "vietnamworks",
-    "tuyensinhso",
-    "123doc.net",
-    "dantri.com.vn",
-    "vnexpress.net",
+    // Báo tổng hợp, giải trí, lá cải, không chính thống
     "baomoi.com",
-    "youtube.com",
-    "webcache.googleusercontent.com",
+    "vietbao.vn",
+    "soha.vn",
+    "kenh14.vn",
+    "eva.vn",
+    "docbao.vn",
+    "2sao.vn",
+    "tintuc.vn",
+    "ngoisao.vn",
+    "yeah1.com",
+    "24h.com.vn",
+
+    // Mạng xã hội, video, cache
     "facebook.com",
     "linkedin.com",
+    "youtube.com",
+    "tiktok.com",
+    "webcache.googleusercontent.com",
     "google.com",
-    "laodong.vn",
-    "tripadvisor.com.vn",
-    "lifestyle.znews.vn",
-    "znews.vn",
+    "chat.zalo.me",
+
+    // Trang tuyển dụng, việc làm, freelancer
+    "vietnamworks.com",
+    "careerlink.vn",
+    "glints.com",
+    "freelancervietnam.vn",
+    "mywork.com.vn",
+    "topcv.vn",
+    "vieclam24h.vn",
+    "timviecnhanh.com",
+    "careerbuilder.vn",
+
+    // Trang luật, tư vấn pháp luật
+    "thuvienphapluat.vn",
+    "luatvietan.vn",
+    "luatvietnam.vn",
+    "phapluatplus.vn",
+    "phapluatxahoi.kinhtedothi.vn",
+
+    // Trang vàng, directory, giới thiệu dịch vụ
     "yellowpages.vn",
     "trangvangvietnam.com",
-    "hbcg.vn",
+    "trangvangtructuyen.vn",
+    "toplist.vn",
+    "top10tphcm.com",
     "maisonoffice.vn",
+    "tuvanquangminh.com",
+    "hbcg.vn",
+
+    // Trang giáo dục, tài liệu, học tập, thi cử
+    "123doc.net",
+    "tuyensinhso.vn",
+    "tailieu.vn",
+
+    // Báo chính thống (có thể loại nếu bạn chỉ muốn nguồn tổ chức độc lập)
+    "vnexpress.net",
+    "dantri.com.vn",
+    "laodong.vn",
+    "vietnamnet.vn",
+    "thanhnien.vn",
+    "tuoitre.vn",
+    "zingnews.vn",
+    "nhandan.vn",
+    "plo.vn",
+    "suckhoedoisong.vn",
+    "baogiaothong.vn",
+    "congthuong.vn",
+    "vov.vn",
+    "vtv.vn",
+    "cand.com.vn",
+    "quochoi.vn",
+    "toquoc.vn",
+    "tienphong.vn",
+    "baochinhphu.vn",
+    "baocaovien.vn",
+    "baodauthau.vn",
+    "baodautu.vn",
+    "thanhnienviet.vn",
+    "nguoilaodong.vn",
+    "viettimes.vn",
+    "doanhnghiepvn.vn",
+    "doanhnhan.vn",
+    "giadinh.net.vn",
+
+    // Báo ngành, tổ chức nhà nước
+    "finance.vietstock.vn",
+    "cafef.vn",
+    "cafebiz.vn",
+    "thitruongtaichinhtiente.vn",
+    "moc.gov.vn",
+    "baoquankhu7.vn",
+    "vietnamreport.net.vn",
+    "vnr500.com.vn",
+    "lifestyle.znews.vn",
+    "tripadvisor.com.vn",
+    "ketoananpha.vn",
+    // Other
+    "masothue.com",
+    "quocluat.vn",
+    "vienquanlyxaydung.edu.vn",
+    "homedy.com",
+    "tuvanhuonglan.vn",
+    "viettelconstruction.com.vn",
   ];
 
   if (unwantedDomains.some((domain) => url.includes(domain))) return false;
@@ -213,8 +297,8 @@ async function searchWithPuppeteer(keyword) {
 (async () => {
   const keyword = "công ty xây dựng";
   const urls = await searchWithPuppeteer(keyword);
-  console.log("🔎 Kết quả tìm kiếm (chính thức, không trùng):", urls);
   console.log(`📦 Tổng số website chính thức: ${urls.length}`);
+  console.log("🔎 Kết quả tìm kiếm (chính thức, không trùng):", urls);
   for (const url of urls) {
     const info = await scrapeWebsite(url);
     console.log("✅ Thông tin thu thập được:", info);
