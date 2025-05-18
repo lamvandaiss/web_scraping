@@ -9,6 +9,7 @@ const urls = [
   "https://thicongnhasaigon.vn/",
   "https://kientrucxaydungtlt.com/",
   "https://saigoncentral.vn/",
+  "https://www.centralcons.vn/",
 ];
 
 // Hàm sleep sử dụng Promise để tạo delay
