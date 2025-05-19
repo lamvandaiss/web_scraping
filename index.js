@@ -3,6 +3,24 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const urlModule = require("url");
 const unwantedDomains = require("./unwanted-domains");
+const XLSX = require("xlsx");
+const fs = require("fs");
+const path = require("path");
+
+function exportToExcel(data, filename = "thong-tin.xlsx") {
+  // Tạo folder nếu chưa có
+  const outputFolder = path.join(__dirname, "output");
+  if (!fs.existsSync(outputFolder)) {
+    fs.mkdirSync(outputFolder);
+  }
+  // Tên file và đường dẫn lưu
+  const filepath = path.join(outputFolder, filename);
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+  XLSX.writeFile(workbook, filepath);
+}
 
 // Tạm dừng giữa các lần request để tránh bị chặn
 function sleep(ms) {
@@ -94,7 +112,7 @@ function extractData(html, url) {
   // Chuẩn hóa số điện thoại
   const rawPhones = phoneCandidates.map(formatPhoneVN);
   const validPhones = [...new Set(rawPhones.filter((p) => p))];
-  const phones = validPhones.slice(0, 2).map(formatReadablePhoneVN);
+  const phones = validPhones.slice(0, 2).map(formatReadablePhoneVN).join("; ");
 
   // Tìm email
   const contactText = $("footer").text() || $("body").text();
@@ -112,8 +130,8 @@ function extractData(html, url) {
   return {
     website: hostname,
     name,
-    phones: phones.length ? phones : ["Không tìm thấy"],
-    email: emailMatch ? emailMatch[0].trim() : "Không tìm thấy",
+    phones: phones.length ? phones : "Không tìm thấy",
+    // email: emailMatch ? emailMatch[0].trim() : "Không tìm thấy",
     address: addressMatch ? addressMatch[2].trim() : "Không tìm thấy",
   };
 }
@@ -259,16 +277,58 @@ async function searchWithPuppeteer(keyword) {
 
   return Array.from(uniqueDomainMap.values());
 }
+// Set name for excel file
+function getTimestampedFilename(prefix = "thong-tin") {
+  const now = new Date();
+  const formatted = now.toISOString().replace(/[:.]/g, "-");
+  return `${prefix}-${formatted}.xlsx`;
+}
+
+// Chuyển sang slug
+function createSlug(str) {
+  const change = str
+    .normalize("NFD") // tách dấu
+    .replace(/[\u0300-\u036f]/g, "") // xóa dấu
+    .replace(/đ/g, "d") // chuyển đ -> d
+    .replace(/Đ/g, "D");
+  const slug = change.replace(/\s+/g, "-").toLowerCase();
+  return slug;
+}
 
 // Chạy chương trình
 (async () => {
-  const keyword = "công ty xây dựng";
+  const keyword = "trường mầm non";
   const urls = await searchWithPuppeteer(keyword);
   console.log(`📦 Tổng số website chính thức: ${urls.length}`);
   console.log("🔎 Kết quả tìm kiếm (chính thức, không trùng):", urls);
+  const output = [];
+  let stt = 0;
   for (const url of urls) {
     const info = await scrapeWebsite(url);
-    console.log("✅ Thông tin thu thập được:", info);
+    if (info && typeof info === "object" && Object.keys(info).length > 0) {
+      stt++;
+      // const infoWithSTT = { STT: stt, ...info };
+      const infoWithSTT = {
+        STT: stt,
+        WEBSITE: info.website,
+        PHONE: info.phones,
+        NAME: info.name,
+        ADDRESS: info.address,
+      };
+      output.push(infoWithSTT);
+
+      console.log("✅ Thông tin thu thập được:", infoWithSTT);
+    } else {
+      console.warn("⚠️ Không lấy được thông tin hợp lệ từ:", url);
+    }
     await sleep(Math.random() * 3000 + 1000); // delay tránh bị chặn
+  }
+  // Xuất file excel
+  if (output.length === 0) {
+    console.warn("❌ Không có dữ liệu hợp lệ để ghi vào Excel.");
+  } else {
+    const filename = getTimestampedFilename(createSlug(keyword));
+    exportToExcel(output, filename);
+    console.log("📤 Đã ghi file Excel:", filename);
   }
 })();
