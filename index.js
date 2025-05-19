@@ -2,6 +2,7 @@ const puppeteer = require("puppeteer");
 const axios = require("axios");
 const cheerio = require("cheerio");
 const urlModule = require("url");
+const unwantedDomains = require("./unwanted-domains");
 
 // Tạm dừng giữa các lần request để tránh bị chặn
 function sleep(ms) {
@@ -23,112 +24,6 @@ function isOfficialDomain(url) {
     ".info",
     ".io",
   ];
-  const unwantedDomains = [
-    // Báo tổng hợp, giải trí, lá cải, không chính thống
-    "baomoi.com",
-    "vietbao.vn",
-    "soha.vn",
-    "kenh14.vn",
-    "eva.vn",
-    "docbao.vn",
-    "2sao.vn",
-    "tintuc.vn",
-    "ngoisao.vn",
-    "yeah1.com",
-    "24h.com.vn",
-
-    // Mạng xã hội, video, cache
-    "facebook.com",
-    "linkedin.com",
-    "youtube.com",
-    "tiktok.com",
-    "webcache.googleusercontent.com",
-    "google.com",
-    "chat.zalo.me",
-
-    // Trang tuyển dụng, việc làm, freelancer
-    "vietnamworks.com",
-    "careerlink.vn",
-    "glints.com",
-    "freelancervietnam.vn",
-    "mywork.com.vn",
-    "topcv.vn",
-    "vieclam24h.vn",
-    "timviecnhanh.com",
-    "careerbuilder.vn",
-
-    // Trang luật, tư vấn pháp luật
-    "thuvienphapluat.vn",
-    "luatvietan.vn",
-    "luatvietnam.vn",
-    "phapluatplus.vn",
-    "phapluatxahoi.kinhtedothi.vn",
-
-    // Trang vàng, directory, giới thiệu dịch vụ
-    "yellowpages.vn",
-    "trangvangvietnam.com",
-    "trangvangtructuyen.vn",
-    "toplist.vn",
-    "top10tphcm.com",
-    "maisonoffice.vn",
-    "tuvanquangminh.com",
-    "hbcg.vn",
-
-    // Trang giáo dục, tài liệu, học tập, thi cử
-    "123doc.net",
-    "tuyensinhso.vn",
-    "tailieu.vn",
-
-    // Báo chính thống (có thể loại nếu bạn chỉ muốn nguồn tổ chức độc lập)
-    "vnexpress.net",
-    "dantri.com.vn",
-    "laodong.vn",
-    "vietnamnet.vn",
-    "thanhnien.vn",
-    "tuoitre.vn",
-    "zingnews.vn",
-    "nhandan.vn",
-    "plo.vn",
-    "suckhoedoisong.vn",
-    "baogiaothong.vn",
-    "congthuong.vn",
-    "vov.vn",
-    "vtv.vn",
-    "cand.com.vn",
-    "quochoi.vn",
-    "toquoc.vn",
-    "tienphong.vn",
-    "baochinhphu.vn",
-    "baocaovien.vn",
-    "baodauthau.vn",
-    "baodautu.vn",
-    "thanhnienviet.vn",
-    "nguoilaodong.vn",
-    "viettimes.vn",
-    "doanhnghiepvn.vn",
-    "doanhnhan.vn",
-    "giadinh.net.vn",
-
-    // Báo ngành, tổ chức nhà nước
-    "finance.vietstock.vn",
-    "cafef.vn",
-    "cafebiz.vn",
-    "thitruongtaichinhtiente.vn",
-    "moc.gov.vn",
-    "baoquankhu7.vn",
-    "vietnamreport.net.vn",
-    "vnr500.com.vn",
-    "lifestyle.znews.vn",
-    "tripadvisor.com.vn",
-    "ketoananpha.vn",
-    // Other
-    "masothue.com",
-    "quocluat.vn",
-    "vienquanlyxaydung.edu.vn",
-    "homedy.com",
-    "tuvanhuonglan.vn",
-    "viettelconstruction.com.vn",
-  ];
 
   if (unwantedDomains.some((domain) => url.includes(domain))) return false;
   return trustedDomains.some((domain) => url.includes(domain));
@@ -137,43 +32,115 @@ function isOfficialDomain(url) {
 // Trích xuất email, số điện thoại, tên, địa chỉ từ HTML
 function extractData(html, url) {
   const $ = cheerio.load(html);
-
   const name = $("title").text().trim();
 
-  // Ưu tiên lấy thông tin từ <footer>
-  let contactSection = $("footer").text();
+  // Bước 1: Lấy các số điện thoại từ <a href="tel:...">
+  let phoneCandidates = [];
+  $("a[href^='tel:']").each((i, el) => {
+    const textPhone = $(el).text().trim();
+    if (textPhone) phoneCandidates.push(textPhone);
+    const hrefPhone = $(el).attr("href").replace(/^tel:/i, "").trim();
+    if (hrefPhone) phoneCandidates.push(hrefPhone);
+  });
 
-  // Nếu không có nội dung footer, tìm phần có chứa từ khóa liên hệ / contact
-  if (!contactSection || contactSection.length < 10) {
-    contactSection = $("body")
-      .find("*")
-      .filter((i, el) => {
-        const txt = $(el).text().toLowerCase();
-        return txt.includes("liên hệ") || txt.includes("contact");
-      })
-      .first()
-      .text();
+  // Bước 2: Lấy số điện thoại từ các vùng text có khả năng
+  if (phoneCandidates.length === 0) {
+    let contactSection = $("footer").text().trim();
+
+    if (!contactSection || contactSection.length < 10) {
+      contactSection = $("header").text().trim();
+    }
+
+    if (!contactSection || contactSection.length < 10) {
+      const possibleSections = $("body")
+        .find("*")
+        .filter((i, el) => {
+          const id = $(el).attr("id") || "";
+          const className = $(el).attr("class") || "";
+          const txt = $(el).text().toLowerCase();
+          return (
+            id.toLowerCase().includes("contact") ||
+            id.toLowerCase().includes("footer") ||
+            id.toLowerCase().includes("info") ||
+            className.toLowerCase().includes("contact") ||
+            className.toLowerCase().includes("footer") ||
+            className.toLowerCase().includes("info") ||
+            txt.includes("liên hệ") ||
+            txt.includes("contact") ||
+            txt.includes("phone") ||
+            txt.includes("điện thoại")
+          );
+        });
+
+      if (possibleSections.length > 0) {
+        contactSection = $(possibleSections[0]).text().trim();
+      }
+    }
+
+    if (!contactSection || contactSection.length < 10) {
+      contactSection = $("body").text().trim();
+    }
+
+    // Dùng regex bắt số điện thoại dạng có dấu chấm, dấu cách, dấu gạch ngang,...
+    const phoneRegex = /(\+?84|0)([\s.\-()]*\d){8,12}/g;
+    const phoneMatches = Array.from(
+      contactSection.matchAll(phoneRegex),
+      (m) => m[0]
+    );
+
+    phoneCandidates = phoneMatches;
   }
 
-  // Lấy thông tin từ phần liên hệ đã chọn
-  const phoneMatch = contactSection.match(/(0|\+84)[0-9 .\-]{8,13}/);
-  const emailMatch = contactSection.match(
+  // Chuẩn hóa số điện thoại
+  const rawPhones = phoneCandidates.map(formatPhoneVN);
+  const validPhones = [...new Set(rawPhones.filter((p) => p))];
+  const phones = validPhones.slice(0, 2).map(formatReadablePhoneVN);
+
+  // Tìm email
+  const contactText = $("footer").text() || $("body").text();
+  const emailMatch = contactText.match(
     /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/
   );
-  const addressMatch = contactSection.match(
-    /(Địa chỉ|Trụ sở|Văn phòng|Address)[\s:\-–]{1,3}([^\n]{10,100})/
+
+  // Tìm địa chỉ
+  const addressMatch = contactText.match(
+    /(Địa chỉ|Trụ sở|Văn phòng|Address)[\s:\-–]{1,3}([^\n\r]{10,150})/i
   );
 
-  const hostname = urlModule.parse(url).hostname.replace("www.", "");
+  const hostname = require("url").parse(url).hostname.replace("www.", "");
 
   return {
     website: hostname,
     name,
-    phone: phoneMatch ? phoneMatch[0].trim() : "Không tìm thấy",
+    phones: phones.length ? phones : ["Không tìm thấy"],
     email: emailMatch ? emailMatch[0].trim() : "Không tìm thấy",
     address: addressMatch ? addressMatch[2].trim() : "Không tìm thấy",
   };
 }
+
+// Hàm chuẩn hóa số điện thoại (loại bỏ dấu chấm, khoảng trắng, chuyển +84 về 0...)
+function formatPhoneVN(phone) {
+  if (!phone) return "";
+  phone = phone.replace(/[\s.\-\(\)]/g, "");
+  if (/^00(?!84)/.test(phone)) return "";
+  if (/^\+(\d{1,3})/.test(phone) && !phone.startsWith("+84")) return "";
+  if (phone.startsWith("+84")) phone = "0" + phone.slice(3);
+  else if (phone.startsWith("84")) phone = "0" + phone.slice(2);
+  if (/^0\d{9,10}$/.test(phone)) return phone;
+  return "";
+}
+
+// Hàm format số điện thoại để dễ đọc
+function formatReadablePhoneVN(phone) {
+  if (!phone) return "";
+  if (phone.length === 10)
+    return phone.replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3");
+  if (phone.length === 11)
+    return phone.replace(/(\d{4})(\d{3})(\d{4})/, "$1 $2 $3");
+  return phone;
+}
+
+module.exports = { extractData };
 
 // ✨ Hàm mới: Tìm trang liên hệ trong website
 async function findContactPage(homeUrl) {

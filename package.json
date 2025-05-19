@@ -15,6 +15,7 @@
     "google-it": "^1.6.4",
     "google-search-results-nodejs": "^2.1.0",
     "puppeteer": "^24.8.2",
-    "robots-parser": "^3.0.1"
+    "robots-parser": "^3.0.1",
+    "xlsx": "^0.18.5"
   }
 }
