@@ -17,6 +17,14 @@ function exportToExcel(data, filename = "thong-tin.xlsx") {
   const filepath = path.join(outputFolder, filename);
 
   const worksheet = XLSX.utils.json_to_sheet(data);
+  // Đặt chiều rộng cột
+  worksheet["!cols"] = [
+    { wch: 4 }, // STT: width ~5 ký tự
+    { wch: 25 }, // WEBSITE: width ~30 ký tự
+    { wch: 40 }, // PHONE: width ~20 ký tự
+    { wch: 60 }, // NAME: width ~50 ký tự
+    { wch: 100 }, // ADDRESS: width ~50 ký tự
+  ];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
   XLSX.writeFile(workbook, filepath);
@@ -46,12 +54,66 @@ function isOfficialDomain(url) {
   if (unwantedDomains.some((domain) => url.includes(domain))) return false;
   return trustedDomains.some((domain) => url.includes(domain));
 }
+//
+async function getRenderedHTMLWithPuppeteer(url) {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    slowMo: 50,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-blink-features=AutomationControlled",
+    ],
+  });
+  const page = await browser.newPage();
+
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+  );
+
+  await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+
+  const html = await page.content();
+
+  await browser.close();
+  return html;
+}
+
+// Clean title
+function cleanTitle(name) {
+  name = name.trim();
+  if (name === "") {
+    name = "Không tìm thấy";
+  }
+  // Nếu name đúng là "Trang chủ" hoặc "Liên hệ" thì giữ nguyên
+  if (/^(Trang chủ|Liên hệ)$/i.test(name)) {
+  }
+  {
+    // Ngược lại, làm sạch như bình thường
+    name = name
+      .replace(
+        /^(Liên hệ|Trang chủ|Giới thiệu|Sản phẩm|Tin tức|Liên hê)\s*[-|:–]\s*/i,
+        ""
+      )
+      .replace(
+        /\s*[-|:–]\s*(Liên hệ|Trang chủ|Giới thiệu|Sản phẩm|Tin tức|Liên hê)$/i,
+        ""
+      )
+      .trim();
+  }
+
+  return name;
+}
 
 // Trích xuất email, số điện thoại, tên, địa chỉ từ HTML
 function extractData(html, url) {
   const $ = cheerio.load(html);
-  const name = $("title").text().trim();
-
+  // Lấy phần name từ title hoặc h1
+  let name = $("title").text().trim();
+  if (!name || name.length < 5) {
+    name = $("h1").first().text().trim(); // thử lấy tiêu đề chính
+  }
+  name = cleanTitle(name);
   // Bước 1: Lấy các số điện thoại từ <a href="tel:...">
   let phoneCandidates = [];
   $("a[href^='tel:']").each((i, el) => {
@@ -193,19 +255,13 @@ async function findContactPage(homeUrl) {
 // 🔍 Truy cập website và chỉ lấy từ trang chủ hoặc trang liên hệ
 async function scrapeWebsite(url) {
   try {
-    const res = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-      },
-    });
-
     // Thử tìm trang liên hệ
     const contactData = await findContactPage(url);
     if (contactData) return contactData;
 
     // Nếu không có thì dùng trang chủ
-    return extractData(res.data, url);
+    const html = await getRenderedHTMLWithPuppeteer(url);
+    return extractData(html, url);
   } catch (err) {
     console.error(`❌ Lỗi truy cập ${url}`);
     return null;
@@ -297,7 +353,7 @@ function createSlug(str) {
 
 // Chạy chương trình
 (async () => {
-  const keyword = "trường mầm non";
+  const keyword = "công ty văn phòng phẩm";
   const urls = await searchWithPuppeteer(keyword);
   console.log(`📦 Tổng số website chính thức: ${urls.length}`);
   console.log("🔎 Kết quả tìm kiếm (chính thức, không trùng):", urls);
