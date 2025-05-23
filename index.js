@@ -353,7 +353,7 @@ function createSlug(str) {
 
 // Chạy chương trình
 (async () => {
-  const keyword = "công ty văn phòng phẩm";
+  const keyword = "công ty phân bón";
   const urls = await searchWithPuppeteer(keyword);
   console.log(`📦 Tổng số website chính thức: ${urls.length}`);
   console.log("🔎 Kết quả tìm kiếm (chính thức, không trùng):", urls);
